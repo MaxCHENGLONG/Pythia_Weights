@@ -3,12 +3,18 @@
 # Download EleutherAI Pythia checkpoints and re-store every weight matrix in the
 # [in_features, out_features] convention .
 #
+# Requires transformers >= 5.x (tested on 5.9.0 / torch 2.12).
+# On transformers 4.x this fails on the `dtype=` kwarg, and - worse - config.rope_parameters
+# does not exist there, so the rotary fields in metadata.json would silently fall back to
+# partial_rotary_factor=1.0 (rotary_ndims recorded as head_dim instead of head_dim // 4).
+#
 # Usage:
-#   python get_Pyhia_70M.py                                   # pythia-70m @ step143000
-#   python get_Pyhia_70M.py --revision step1000
-#   python get_Pyhia_70M.py --revision step0 step1 step128     # several at once
-#   python get_Pyhia_70M.py --all-steps --purge-cache          # all 154 revisions
-#   python get_Pyhia_70M.py --size 160m --deduped
+#   python get_Pyhia_weights.py                                   # pythia-70m @ step143000
+#   python get_Pyhia_weights.py --revision step1000
+#   python get_Pyhia_weights.py --revision step0 step1 step128     # several at once
+#   python get_Pyhia_weights.py --all-steps --purge-cache          # all 154 revisions
+#   python get_Pyhia_weights.py --size 160m --deduped
+#   python get_Pyhia_weights.py --size 1b --out-dir /data          # -> /data/pythia-1b/<revision>/
 #
 # pythia-70m architecture (GPTNeoXForCausalLM):
 #   - 6 transformer layers (NO parameter sharing, unlike ALBERT)
