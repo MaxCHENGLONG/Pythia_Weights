@@ -244,20 +244,30 @@ def extract_mlp_weights(model):
     }
 
 
+def get_unembed(model):
+    """
+    Return the unembedding nn.Linear.
+
+    transformers renamed GPTNeoXForCausalLM.embed_out to .lm_head in the GPTNeoX
+    standardisation refactor (~v4.51); checkpoints still load either way.
+    """
+    return model.lm_head if hasattr(model, "lm_head") else model.embed_out
+
+
 def extract_embeddings(model):
     """
     Extract embeddings, the final LayerNorm and the unembedding matrix.
 
     embed_in.weight is [vocab_size, hidden_size], which is already
     [in_features, out_features] (a one-hot token index maps to a hidden vector),
-    so it is stored as-is. embed_out is an nn.Linear and is transposed.
+    so it is stored as-is. The unembedding is an nn.Linear and is transposed.
 
     Pythia has no learned position embeddings - position enters only through RoPE.
     """
     print("\nExtracting embeddings and final LayerNorm...")
 
     embed_in = model.gpt_neox.embed_in.weight.cpu().float()
-    W_unembed = model.embed_out.weight.cpu().float().T
+    W_unembed = get_unembed(model).weight.cpu().float().T
     final_ln_weight = model.gpt_neox.final_layer_norm.weight.cpu().float()
     final_ln_bias = model.gpt_neox.final_layer_norm.bias.cpu().float()
 
@@ -317,8 +327,8 @@ def verify_roundtrip(model, attn, mlp, emb):
         if not torch.equal(o_heads, attn["W_O"][layer_idx]):
             raise AssertionError(f"per-head / fused mismatch: layer {layer_idx} W_O")
 
-    if not torch.equal(emb["W_unembed"].T, model.embed_out.weight.cpu().float()):
-        raise AssertionError("round-trip mismatch: embed_out.weight")
+    if not torch.equal(emb["W_unembed"].T, get_unembed(model).weight.cpu().float()):
+        raise AssertionError("round-trip mismatch: unembedding weight")
 
     print("  All layers: fused QKV, W_O, MLP and unembedding rebuild exactly.")
 
