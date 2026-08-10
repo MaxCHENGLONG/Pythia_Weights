@@ -54,6 +54,7 @@ class PythiaHand:
         self.eps = meta["layer_norm_eps"]
         self.rotary_ndims = meta["position_encoding"]["rotary_ndims"]
         self.rope_theta = meta["position_encoding"]["rope_theta"]
+        self.dtype = weights["embed_in"].dtype
 
         if not meta["residual_structure"]["use_parallel_residual"]:
             raise ValueError("this implementation assumes use_parallel_residual=True")
@@ -84,12 +85,18 @@ class PythiaHand:
 
         Returns two [T, rotary_ndims] tensors. Only rotary_ndims of the head_dim
         columns are ever rotated - Pythia sets rotary_ndims = head_dim // 4.
+
+        The table is built in float32 and cast at the end, mirroring transformers:
+        inv_freq is a float32 buffer there and the rotary forward ends with
+        cos.to(x.dtype). Building it natively in float64 would disagree with HF by
+        ~1e-6 rad at the longer positions and would put a floor under the float64
+        comparison in verify_hand_vs_hf.py. For float32 the cast is a no-op.
         """
         half = torch.arange(0, self.rotary_ndims, 2, dtype=torch.float32)
         inv_freq = 1.0 / (self.rope_theta ** (half / self.rotary_ndims))
         freqs = torch.outer(positions.float(), inv_freq)      # [T, rotary_ndims / 2]
         emb = torch.cat([freqs, freqs], dim=-1)               # [T, rotary_ndims]
-        return emb.cos(), emb.sin()
+        return emb.cos().to(self.dtype), emb.sin().to(self.dtype)
 
     def apply_rope(self, x, cos, sin):
         """
