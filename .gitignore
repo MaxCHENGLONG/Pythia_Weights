@@ -1,3 +1,4 @@
 pythia-*/
 .vscode
 __pycache__/
+pythia_weights/
