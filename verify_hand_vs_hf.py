@@ -83,7 +83,6 @@ def main(path):
     ref = AutoModelForCausalLM.from_pretrained(
         meta["model"], revision=meta["revision"],
         dtype=torch.float32, attn_implementation="eager",
-        attn_implementation = "eager"
     )
     ref.eval()
 
